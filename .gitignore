@@ -1,0 +1,38 @@
+# Private workspace, credentials and exports
+data/*
+!data/.gitkeep
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.pem
+*.key
+backups/
+exports/
+
+# Local Python, JavaScript and browser tooling
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+.tmp/
+playwright-report/
+test-results/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Historical local UI previews; published screenshots use synthetic fixtures
+docs/previews/

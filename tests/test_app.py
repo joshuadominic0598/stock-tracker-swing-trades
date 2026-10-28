@@ -9,9 +9,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
-from app import market, storage
-from server import Handler
-
+from swing_signal.data import market, storage
+from swing_signal.http.server import Handler
 
 class AppTests(unittest.TestCase):
     @classmethod
@@ -167,7 +166,7 @@ class AppTests(unittest.TestCase):
         legacy = dict(bars=[dict(time="2026-10-20", close=100)], source="Your CSV import")
         current = dict(bars=[dict(time="2026-10-21", close=101)], source="Yahoo Finance")
         storage.cache_set("price:ASIANPAINT", legacy, market.now())
-        with patch("app.market.yahoo", return_value=current) as fetch:
+        with patch("swing_signal.data.market.yahoo", return_value=current) as fetch:
             market.fetch_asset(storage.asset("ASIANPAINT"))
         fetch.assert_called_once_with("ASIANPAINT.NS")
         self.assertEqual(storage.cache_get("price:ASIANPAINT")["value"], current)
@@ -201,7 +200,7 @@ class AppTests(unittest.TestCase):
             source="Yahoo Finance",
         )
         storage.cache_set("price:COALINDIA", value, market.now())
-        with patch("app.market.yahoo", side_effect=OSError("Source down")):
+        with patch("swing_signal.data.market.yahoo", side_effect=OSError("Source down")):
             with self.assertRaises(OSError):
                 market.fetch_asset(storage.asset("COALINDIA"))
         self.assertEqual(storage.cache_get("price:COALINDIA")["value"], value)
@@ -216,7 +215,7 @@ class AppTests(unittest.TestCase):
 
     def test_model_connection_check_has_a_dedicated_endpoint(self):
         with patch(
-            "app.ai_providers.check_connection",
+            "swing_signal.ai.providers.check_connection",
             return_value=dict(ok=True, provider="openai", model="gpt-5-mini"),
         ) as check:
             status, result = self.post(
@@ -246,11 +245,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.post("assets/HCG/trends-import", dict(csv="invalid"))[0], 400)
 
     def test_unknown_asset_and_path_traversal(self):
-        for path in ("/api/assets/NOTHERE", "/../server.py"):
+        for path in ("/api/assets/NOTHERE", "/../launch.py"):
             with self.assertRaises(urllib.error.HTTPError) as ctx:
                 urllib.request.urlopen(self.base + path)
             self.assertEqual(ctx.exception.code, 404)
-
 
 if __name__ == "__main__":
     unittest.main()

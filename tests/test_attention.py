@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from app import attention, market, storage
+from swing_signal.data import attention, market, storage
 
 UTC = timezone.utc
 CLOCK = datetime(2026, 10, 24, 5, tzinfo=UTC)
@@ -14,7 +14,6 @@ ASSET = dict(
     market="NSE",
     sector="Healthcare",
 )
-
 
 class AttentionTests(unittest.TestCase):
     def setUp(self):
@@ -98,7 +97,7 @@ class AttentionTests(unittest.TestCase):
             )
             + "</feed>"
         )
-        with patch("app.attention.now", return_value=CLOCK):
+        with patch("swing_signal.data.attention.now", return_value=CLOCK):
             out = attention.community(ASSET, lambda _: xml.encode())
         self.assertEqual(len(out["posts"]), 1)
         self.assertEqual(out["activity"]["recent"], 1)
@@ -114,7 +113,7 @@ class AttentionTests(unittest.TestCase):
 
     def test_google_no_trending_match_is_not_a_zero_search_count(self):
         xml = b'<rss xmlns:ht="https://trends.google.com/trending/rss"><channel><item><title>unrelated sport</title><ht:approx_traffic>200+</ht:approx_traffic></item></channel></rss>'
-        with patch("app.attention.now", return_value=CLOCK):
+        with patch("swing_signal.data.attention.now", return_value=CLOCK):
             out = attention.trends(ASSET, lambda _: xml)
         self.assertFalse(out["available"])
         self.assertTrue(out["trending_now"]["available"])
@@ -123,7 +122,7 @@ class AttentionTests(unittest.TestCase):
 
     def test_google_matching_topic_preserves_approximate_label(self):
         xml = b'<rss xmlns:ht="https://trends.google.com/trending/rss"><channel><item><title>HCG share price</title><ht:approx_traffic>500+</ht:approx_traffic></item></channel></rss>'
-        with patch("app.attention.now", return_value=CLOCK):
+        with patch("swing_signal.data.attention.now", return_value=CLOCK):
             out = attention.trends(ASSET, lambda _: xml)
         self.assertEqual(out["trending_now"]["matches"][0]["traffic"], "500+")
         self.assertFalse(out["available"])
@@ -166,14 +165,13 @@ class AttentionTests(unittest.TestCase):
     def test_news_headlines_deduplicate_and_match_the_company(self):
         xml = b"<rss><channel><item><title>HCG profit jumps - News</title><link>https://news.google.com/a</link><source>News</source><pubDate>Fri, 23 Oct 2026 05:00:00 GMT</pubDate></item><item><title>HCG profit jumps - News</title><link>https://news.google.com/a</link><source>News</source></item><item><title>Unrelated company - News</title><link>https://news.google.com/b</link><source>News</source></item></channel></rss>"
         with (
-            patch("app.market.request", return_value=xml),
-            patch("app.attention.now", return_value=CLOCK),
+            patch("swing_signal.data.market.request", return_value=xml),
+            patch("swing_signal.data.attention.now", return_value=CLOCK),
         ):
             out = market.news(ASSET)
         self.assertEqual(len(out["articles"]), 1)
         self.assertEqual(out["activity"]["recent"], 1)
         self.assertEqual(out["articles"][0]["tone"]["direction"], "positive")
-
 
 if __name__ == "__main__":
     unittest.main()

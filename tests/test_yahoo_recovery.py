@@ -3,10 +3,9 @@ from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from app import market
-from app.indicators import enrich, rsi, sma
-from app.signals import assess, period_trend
-
+from swing_signal.analysis.indicators import enrich, rsi, sma
+from swing_signal.analysis.signals import assess, period_trend
+from swing_signal.data import market
 
 class YahooSessionTests(unittest.TestCase):
     def raw(self, day=None, count=7, zero=False):
@@ -32,7 +31,7 @@ class YahooSessionTests(unittest.TestCase):
         self,
     ):
         raw, day = self.raw(zero=True)
-        with patch("app.market.get_json", return_value=raw):
+        with patch("swing_signal.data.market.get_json", return_value=raw):
             out = market.yahoo_recent_days("TCS.NS", [day], ZoneInfo("Asia/Kolkata"), {day: 9876})
         self.assertEqual(out[day]["open"], 100)
         self.assertEqual(out[day]["close"], 107)
@@ -46,19 +45,19 @@ class YahooSessionTests(unittest.TestCase):
                 raw["chart"]["result"][0]["timestamp"][-1] = raw["chart"]["result"][0]["timestamp"][
                     0
                 ]
-            with patch("app.market.get_json", return_value=raw):
+            with patch("swing_signal.data.market.get_json", return_value=raw):
                 out = market.yahoo_recent_days("TCS.NS", [day], ZoneInfo("Asia/Kolkata"))
             self.assertEqual(out, {})
         raw, day = self.raw()
         raw["chart"]["result"][0]["indicators"]["quote"][0]["close"][3] = None
-        with patch("app.market.get_json", return_value=raw):
+        with patch("swing_signal.data.market.get_json", return_value=raw):
             self.assertEqual(
                 market.yahoo_recent_days("TCS.NS", [day], ZoneInfo("Asia/Kolkata")), {}
             )
 
     def test_zero_traded_volume_with_a_price_range_needs_reported_daily_volume(self):
         raw, day = self.raw(zero=True)
-        with patch("app.market.get_json", return_value=raw):
+        with patch("swing_signal.data.market.get_json", return_value=raw):
             self.assertEqual(
                 market.yahoo_recent_days("TCS.NS", [day], ZoneInfo("Asia/Kolkata")), {}
             )
@@ -74,11 +73,10 @@ class YahooSessionTests(unittest.TestCase):
                 return fixed.astimezone(tz) if tz else fixed.replace(tzinfo=None)
 
         with (
-            patch("app.market.get_json", return_value=raw),
-            patch("app.market.datetime", Clock),
+            patch("swing_signal.data.market.get_json", return_value=raw),
+            patch("swing_signal.data.market.datetime", Clock),
         ):
             self.assertEqual(market.yahoo_recent_days("TCS.NS", [day], z), {})
-
 
 class TrendAndRSITests(unittest.TestCase):
     def test_net_uptrend_can_be_yes_with_a_red_latest_candle_below_recent_high(self):
@@ -130,7 +128,6 @@ class TrendAndRSITests(unittest.TestCase):
         ]
         self.assertTrue(period_trend(bars, 14, calendar=False)["rising"])
         self.assertFalse(period_trend(bars[:10], 14, calendar=False)["available"])
-
 
 if __name__ == "__main__":
     unittest.main()

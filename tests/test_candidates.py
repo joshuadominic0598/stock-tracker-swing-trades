@@ -1,11 +1,10 @@
 import unittest
 from datetime import date, timedelta
 
-from app.indicators import enrich
-from app.market import long_candidates
-from app.patterns import support_retest
-from app.signals import assess
-
+from swing_signal.analysis.indicators import enrich
+from swing_signal.analysis.patterns import support_retest
+from swing_signal.analysis.signals import assess
+from swing_signal.data.market import long_candidates
 
 def sample(values):
     return enrich(
@@ -21,7 +20,6 @@ def sample(values):
             for i, v in enumerate(values)
         ]
     )
-
 
 def pattern_data():
     # Decline, first trough, intervening rally, second trough, strong rebound.
@@ -47,7 +45,6 @@ def pattern_data():
     ]
     data = sample(values)
     return enrich(data)
-
 
 class RetestTests(unittest.TestCase):
     def test_retest_confirmation_needs_breakout_strong_response_and_upward_trend(self):
@@ -115,7 +112,6 @@ class RetestTests(unittest.TestCase):
             )
         self.assertNotEqual(support_retest(enrich(data))["status"], "confirmed")
 
-
 class CandidateTests(unittest.TestCase):
     def asset(self, symbol, positives=1, negatives=0, **extra):
         items = [
@@ -158,7 +154,6 @@ class CandidateTests(unittest.TestCase):
         out = long_candidates([self.asset("CONFLICT", 1, 3), self.asset("ALIGNED", 3, 0)])
         self.assertEqual([v["symbol"] for v in out["items"]], ["ALIGNED", "CONFLICT"])
         self.assertEqual(len(out["items"][1]["counterpoints"]), 3)
-
 
 if __name__ == "__main__":
     unittest.main()

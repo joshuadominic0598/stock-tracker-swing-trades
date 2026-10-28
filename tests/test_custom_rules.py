@@ -3,10 +3,9 @@
 import unittest
 from datetime import date, timedelta
 
-from app.indicators import enrich, weekly
-from app.market import long_candidates
-from app.signals import assess
-
+from swing_signal.analysis.indicators import enrich, weekly
+from swing_signal.analysis.signals import assess
+from swing_signal.data.market import long_candidates
 
 def history(values):
     return enrich(
@@ -23,10 +22,8 @@ def history(values):
         ]
     )
 
-
 def signal(reading, key):
     return next(x for x in reading["signals"] if x["key"] == key)
-
 
 class CustomRulesTests(unittest.TestCase):
     def test_rsi_recovery_needs_strict_dip_reclaim_and_current_rise(self):
@@ -180,7 +177,6 @@ class CustomRulesTests(unittest.TestCase):
         data[-1]["close"] = 101.01
         a["daily_swing"] = assess(data, zones)
         self.assertIn("move", [s["key"] for s in long_candidates([a])["items"][0]["matched"]])
-
 
 if __name__ == "__main__":
     unittest.main()

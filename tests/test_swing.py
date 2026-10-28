@@ -7,11 +7,11 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from app import intelligence, market, settings, storage
-from app.indicators import enrich, weekly
-from app.signals import assess, financial_meanings, highs
-from app.zones import discover
-
+from swing_signal.ai import intelligence, settings
+from swing_signal.analysis.indicators import enrich, weekly
+from swing_signal.analysis.signals import assess, financial_meanings, highs
+from swing_signal.analysis.zones import discover
+from swing_signal.data import market, storage
 
 def bars(values, start=date(2025, 1, 1)):
     return [
@@ -25,7 +25,6 @@ def bars(values, start=date(2025, 1, 1)):
         )
         for i, c in enumerate(values)
     ]
-
 
 class SwingTests(unittest.TestCase):
     def test_exactly_one_percent_is_not_more_than_one(self):
@@ -139,7 +138,6 @@ class SwingTests(unittest.TestCase):
             )
         )
 
-
 class SourceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -196,7 +194,7 @@ class SourceTests(unittest.TestCase):
             provider_symbol="AAPL",
             as_of=market.now(),
         )
-        with patch("app.market.yahoo", return_value=data) as fetch:
+        with patch("swing_signal.data.market.yahoo", return_value=data) as fetch:
             market.fetch_asset(storage.asset("AAPL"))
         fetch.assert_called_once_with("AAPL")
 
@@ -209,7 +207,7 @@ class SourceTests(unittest.TestCase):
             as_of=market.now(),
         )
         storage.cache_set("price:HCG", old, market.now())
-        with patch("app.market.yahoo", return_value=incoming) as fetch:
+        with patch("swing_signal.data.market.yahoo", return_value=incoming) as fetch:
             market.fetch_asset(storage.asset("HCG"))
         fetch.assert_called_once_with("HCG.NS")
         self.assertEqual(storage.cache_get("price:HCG")["value"]["source"], "Yahoo Finance")
@@ -249,7 +247,7 @@ class SourceTests(unittest.TestCase):
                 dict(symbol="NEW.NS", shortname="New company"),
             ]
         )
-        with patch("app.market.get_json", return_value=raw) as request:
+        with patch("swing_signal.data.market.get_json", return_value=raw) as request:
             out = market.search_catalog("HCG")
         self.assertEqual([r["symbol"] for r in out["results"]], ["HCG", "NEW"])
         self.assertTrue(out["results"][0]["tracked"])
@@ -257,7 +255,7 @@ class SourceTests(unittest.TestCase):
         self.assertIn("finance.yahoo.com", request.call_args[0][0])
 
     def test_consumer_group_tracks_requested_names_and_excludes_parle(self):
-        from app.config import research_group
+        from swing_signal.config import research_group
 
         for symbol in (
             "DRREDDY",
@@ -281,7 +279,6 @@ class SourceTests(unittest.TestCase):
         pair = market.correlations()[0]
         self.assertEqual(pair["samples"], 60)
         self.assertAlmostEqual(pair["value"], 1)
-
 
 class AIIntegrationTests(unittest.TestCase):
     def test_only_curated_models_are_exposed(self):
@@ -342,19 +339,19 @@ class AIIntegrationTests(unittest.TestCase):
                 self.close()
 
         with (
-            patch("app.intelligence.models", return_value=dict(models=[])),
+            patch("swing_signal.ai.intelligence.models", return_value=dict(models=[])),
             patch(
-                "app.settings.read",
+                "swing_signal.ai.settings.read",
                 return_value=dict(
                     gemini_api_key="private-key", gemini_model="gemini-2.5-flash-lite"
                 ),
             ),
-            patch("app.intelligence.evidence_pack", return_value=[source]),
+            patch("swing_signal.ai.intelligence.evidence_pack", return_value=[source]),
             patch(
                 "urllib.request.urlopen",
                 return_value=Response(json.dumps(raw).encode()),
             ) as call,
-            patch("app.storage.cache_set"),
+            patch("swing_signal.data.storage.cache_set"),
         ):
             result = intelligence.generate(
                 dict(symbol="HCG", name="HCG", market="NSE"), "", "1d", "gemini"
@@ -368,14 +365,14 @@ class AIIntegrationTests(unittest.TestCase):
         selected["summary"] = ["INVENTED_BUY_CALL"]
         raw["candidates"][0]["content"]["parts"][0]["text"] = json.dumps(selected)
         with (
-            patch("app.intelligence.models", return_value=dict(models=[])),
+            patch("swing_signal.ai.intelligence.models", return_value=dict(models=[])),
             patch(
-                "app.settings.read",
+                "swing_signal.ai.settings.read",
                 return_value=dict(
                     gemini_api_key="private-key", gemini_model="gemini-2.5-flash-lite"
                 ),
             ),
-            patch("app.intelligence.evidence_pack", return_value=[source]),
+            patch("swing_signal.ai.intelligence.evidence_pack", return_value=[source]),
             patch(
                 "urllib.request.urlopen",
                 return_value=Response(json.dumps(raw).encode()),
@@ -385,7 +382,6 @@ class AIIntegrationTests(unittest.TestCase):
                 intelligence.generate(
                     dict(symbol="HCG", name="HCG", market="NSE"), "", "1d", "gemini"
                 )
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app import intelligence, market, storage
-
+from swing_signal.ai import intelligence
+from swing_signal.data import market, storage
 
 class StockSectorContextTests(unittest.TestCase):
     def setUp(self):
@@ -31,7 +31,7 @@ class StockSectorContextTests(unittest.TestCase):
     def test_industry_context_stays_centered_on_stock_and_keeps_custom_group_distinct(
         self,
     ):
-        with patch("app.market.asset_detail", side_effect=self.detail):
+        with patch("swing_signal.data.market.asset_detail", side_effect=self.detail):
             out = market.sector_context(storage.asset("DRREDDY"))
         self.assertTrue(out["available"])
         self.assertEqual(out["industry"], "Healthcare")
@@ -49,14 +49,14 @@ class StockSectorContextTests(unittest.TestCase):
                 d["stale"] = True
             return d
 
-        with patch("app.market.asset_detail", side_effect=detail):
+        with patch("swing_signal.data.market.asset_detail", side_effect=detail):
             out = market.sector_context(storage.asset("DRREDDY"))
         self.assertFalse(out["available"])
         self.assertIsNone(out["change"])
         self.assertIsNone(out["relative_change"])
 
     def test_custom_group_fallback_is_named_as_a_tracked_sample(self):
-        with patch("app.market.asset_detail", side_effect=self.detail):
+        with patch("swing_signal.data.market.asset_detail", side_effect=self.detail):
             out = market.sector_context(storage.asset("ASIANPAINT"))
         self.assertEqual(out["basis"], "Your tracked research group")
         self.assertEqual(out["label"], "Consumer")
@@ -78,7 +78,7 @@ class StockSectorContextTests(unittest.TestCase):
                 change_20d=3,
             ),
         )
-        with patch("app.market.asset_detail", side_effect=self.detail):
+        with patch("swing_signal.data.market.asset_detail", side_effect=self.detail):
             context = market.sector_context(storage.asset("DRREDDY"))
         sources = [
             technical,
@@ -101,7 +101,6 @@ class StockSectorContextTests(unittest.TestCase):
         self.assertIn("Healthcare", catalog["S1_CONTEXT"]["text"])
         self.assertIn("Consumer", catalog["S1_CONTEXT"]["text"])
         self.assertIn("not the whole sector", catalog["S1_RELATIVE"]["text"])
-
 
 if __name__ == "__main__":
     unittest.main()

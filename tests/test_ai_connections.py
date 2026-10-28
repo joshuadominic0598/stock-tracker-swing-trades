@@ -7,8 +7,9 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
-from app import ai_providers, intelligence, settings, storage
-
+from swing_signal.ai import intelligence, settings
+from swing_signal.ai import providers as ai_providers
+from swing_signal.data import storage
 
 class Response(io.BytesIO):
     def __enter__(self):
@@ -17,10 +18,8 @@ class Response(io.BytesIO):
     def __exit__(self, *args):
         self.close()
 
-
 def response(value):
     return Response(json.dumps(value).encode())
-
 
 class ConnectionTests(unittest.TestCase):
     def setUp(self):
@@ -77,7 +76,7 @@ class ConnectionTests(unittest.TestCase):
         self.assertEqual(settings.read()["openai_api_key"], "private-openai")
         if os.name != "nt":
             self.assertEqual(settings.path().stat().st_mode & 0o777, 0o600)
-        with patch("app.ai_providers.local_catalog", return_value=([], None)):
+        with patch("swing_signal.ai.providers.local_catalog", return_value=([], None)):
             catalog = ai_providers.models()
         self.assertEqual(set(catalog["providers"]), {"local", "gemini", "openai", "groq"})
         self.assertTrue(catalog["providers"]["openai"]["configured"])
@@ -263,7 +262,7 @@ class ConnectionTests(unittest.TestCase):
             usage=dict(input_tokens=120, output_tokens=40),
         )
         with (
-            patch("app.intelligence.evidence_pack", return_value=[self.source()]),
+            patch("swing_signal.ai.intelligence.evidence_pack", return_value=[self.source()]),
             patch("urllib.request.urlopen", return_value=response(raw)) as call,
         ):
             out = intelligence.generate(
@@ -297,7 +296,7 @@ class ConnectionTests(unittest.TestCase):
             ]
         )
         with (
-            patch("app.intelligence.evidence_pack", return_value=[self.source()]),
+            patch("swing_signal.ai.intelligence.evidence_pack", return_value=[self.source()]),
             patch("urllib.request.urlopen", return_value=response(raw)) as call,
         ):
             out = intelligence.generate(
@@ -336,7 +335,7 @@ class ConnectionTests(unittest.TestCase):
         ]
         for raw in cases:
             with (
-                patch("app.intelligence.evidence_pack", return_value=[self.source()]),
+                patch("swing_signal.ai.intelligence.evidence_pack", return_value=[self.source()]),
                 patch("urllib.request.urlopen", return_value=response(raw)) as call,
             ):
                 with self.assertRaises(ValueError):
@@ -357,7 +356,6 @@ class ConnectionTests(unittest.TestCase):
         ) as call:
             ai_providers.complete("local", "granite4:7b", "system", "prompt", {})
         self.assertNotIn("think", json.loads(call.call_args[0][0].data))
-
 
 if __name__ == "__main__":
     unittest.main()

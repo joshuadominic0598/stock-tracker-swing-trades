@@ -1,8 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import intelligence
-
+from swing_signal.ai import intelligence
 
 class IntelligenceTests(unittest.TestCase):
     def test_catalog_keeps_zone_direction_and_volume_units(self):
@@ -75,7 +74,7 @@ class IntelligenceTests(unittest.TestCase):
 
     def test_uninstalled_model_is_never_requested(self):
         with patch(
-            "app.intelligence.models",
+            "swing_signal.ai.intelligence.models",
             return_value=dict(available=True, models=["local-model"]),
         ):
             with self.assertRaisesRegex(ValueError, "already installed"):
@@ -86,7 +85,6 @@ class IntelligenceTests(unittest.TestCase):
             status = intelligence.models()
         self.assertFalse(status["available"])
         self.assertEqual(status["models"], [])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,7 +33,7 @@ Bull/bear readings describe the app’s technical rule balance—not measured or
 
 ## Start in a few minutes
 
-**Requirements:** Python 3.9+ and a modern browser. macOS and Linux use the Python standard library; Windows also needs the timezone package in `requirements.txt`. Node.js is only for development checks.
+**Requirements:** Python 3.9+ and a modern browser. macOS and Linux use the Python standard library; Windows also needs the timezone dependency declared in `pyproject.toml`. Node.js is only for development checks.
 
 ### macOS / Linux
 
@@ -51,7 +51,7 @@ On macOS, you can also double-click **Start Swing Signal.command** in Finder. Ke
 git clone https://github.com/joshuadominic0598/stock-tracker-swing-trades.git
 cd stock-tracker-swing-trades
 py -3 -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install .
 .venv\Scripts\python launch.py
 ```
 
@@ -62,7 +62,7 @@ New workspaces start with **55 curated watchlist assets and no holdings, positio
 For a specific port or separate workspace:
 
 ```sh
-python3 server.py --port 8767 --data-dir ./data --open
+python3 launch.py --port 8767 --data-dir ./data --open
 ```
 
 `--no-refresh` opens existing cached data without scheduling network refreshes. Use `--help` for the available options.
@@ -129,7 +129,7 @@ The core signals and charts work without AI. Open **Data & AI connections**, sav
 
 For local AI, install [Ollama](https://ollama.com/) and explicitly download a model, for example `ollama pull qwen3:8b`. Enable the installed model in Swing Signal’s connections screen.
 
-Model menus are maintained in [app/model_catalog.py](app/model_catalog.py). Availability, pricing and quotas can change: see the in-app provider links and [data sources](docs/DATA_SOURCES.md). A free/paid preference does not change provider billing. Use an unbilled/free provider account for free-only use.
+Model menus are maintained in [AI model catalog](src/swing_signal/ai/catalog.py). Availability, pricing and quotas can change: see the in-app provider links and [data sources](docs/DATA_SOURCES.md). A free/paid preference does not change provider billing. Use an unbilled/free provider account for free-only use.
 
 Connection checks read model metadata; they do not generate analysis or verify remaining credits. There are **no automatic provider/model fallbacks or background AI calls**. Models select source-linked facts, and the app renders the factual figures. No model is represented as a validated finance specialist.
 
@@ -145,45 +145,59 @@ Stock prices/history come from Yahoo Finance; crypto candles use Binance and glo
 
 Missing candles are not interpolated. Complete Yahoo hourly sessions can repair explicitly missing recent NSE daily candles, with provenance shown. Weekly readings may include an unfinished week and are labelled provisional. Public feeds may be delayed, incomplete or unavailable, and this app is not a licensed real-time feed.
 
-Your watchlist, holdings, zones, journal and caches live in `data/signaldesk.sqlite3`, or the directory passed to `--data-dir`. Keys/defaults live separately in that workspace’s `connections.json`, with `0600` file permissions on macOS/Linux (Windows inherits the workspace folder’s ACLs). Both are excluded from Git. Optional environment overrides are documented in [.env.example](.env.example); the app does not automatically load `.env` files.
+Your watchlist, holdings, zones, journal and caches live in `data/signaldesk.sqlite3`, or the directory passed to `--data-dir`. Keys/defaults live separately in that workspace’s `connections.json`, with `0600` file permissions on macOS/Linux (Windows inherits the workspace folder’s ACLs). Both are excluded from Git. The source launcher preserves this location; a wheel installed outside the checkout defaults to `~/.swing-signal/`. Optional environment overrides are documented in [environment template](docs/examples/.env.example); the app does not automatically load `.env` files.
 
 Cloud AI receives public research facts for the selected stock and its peer context. Private journal text, position sizes and entry costs are excluded. Provider data-use policies still apply. Ollama requests stay on the local endpoint.
 
 **Export workspace** creates a local JSON backup without credentials. It can contain your holdings and notes: keep exports private. For a full restore, stop the app and restore the SQLite file from your own backup; a JSON-restore screen is not implemented. Back up credentials separately if needed.
 
+## A small front door, clear internals
+
+```text
+src/swing_signal/   Python package and bundled web interface
+tests/              Python regression tests
+tools/              Development checks and browser-test tooling
+docs/               Methodology, data sources and contributor guide
+launch.py           Start from the source checkout
+pyproject.toml      Package metadata, dependencies and Python settings
+```
+
+The application separates technical analysis, market data, AI connections, HTTP routing and workspace edits. No frontend build is required to run it. [See the architecture and coding guide](docs/CONTRIBUTING.md).
+
 ## Contributing and development checks
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture, coding conventions and the full verification workflow. Development needs Python 3.9+ and Node.js 24+; normal app use does not need Node.
+See [contributing guide](docs/CONTRIBUTING.md) for architecture, coding conventions and the full verification workflow. Development needs Python 3.9+ and Node.js 24+; normal app use does not need Node.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
-npm ci
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e ".[dev]"
+npm --prefix tools/web ci
 .venv/bin/python -m ruff check .
-.venv/bin/python -m ruff format --check .
+.venv/bin/python tools/format_python.py --check
 .venv/bin/python -m unittest discover -s tests -v
-npm run check
-npx playwright install chromium
-npm run test:ui
+npm --prefix tools/web run check
+npm --prefix tools/web exec -- playwright install chromium
+npm --prefix tools/web run test:ui
 ```
 
 On Windows, replace `.venv/bin/python` with `.venv\Scripts\python` and set `SIGNALDESK_PYTHON` to that executable for browser tests. CI runs Python checks on Linux, macOS and Windows, plus offline Chromium UI tests. Browser fixtures use synthetic data in an ignored workspace; they do not call paid AI services or use your saved keys.
 
-Before sharing a commit, stage the intended files and run `python3 scripts/check_shareable.py`. It checks the Git index for private/runtime files, likely credentials and any configured local keys without printing their values.
+Before sharing a commit, stage the intended files and run `python3 tools/check_shareable.py`. It checks the Git index for private/runtime files, likely credentials and any configured local keys without printing their values.
 
 ## Troubleshooting
 
-| Problem                 | What to check                                                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| App is not opening      | Run the launcher from the project folder and read the Terminal output. Ensure Python is installed and keep the process running.                  |
-| Port already used       | The launcher tries alternate ports. You can also set `--port` directly.                                                                          |
-| Empty or stale chart    | Check source health and timestamps, then refresh. Upstream access or missing candles may prevent a current reading.                              |
-| `ZoneInfoNotFoundError` | Windows needs `requirements.txt`; minimal Linux installations may also need IANA timezone data or the `tzdata` package in a virtual environment. |
-| Ollama model missing    | Start Ollama, install the model, refresh installed models and enable it in connections.                                                          |
-| Cloud model rejected    | Check the key, selected model, project permissions and quota. Errors do not trigger another provider or a paid fallback.                         |
+| Problem                 | What to check                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App is not opening      | Run the launcher from the project folder and read the Terminal output. Ensure Python is installed and keep the process running.                         |
+| Port already used       | The launcher tries alternate ports. You can also set `--port` directly.                                                                                 |
+| Empty or stale chart    | Check source health and timestamps, then refresh. Upstream access or missing candles may prevent a current reading.                                     |
+| `ZoneInfoNotFoundError` | Windows needs `python -m pip install .`; minimal Linux installations may also need IANA timezone data or the `tzdata` package in a virtual environment. |
+| Ollama model missing    | Start Ollama, install the model, refresh installed models and enable it in connections.                                                                 |
+| Cloud model rejected    | Check the key, selected model, project permissions and quota. Errors do not trigger another provider or a paid fallback.                                |
 
 ## License and limits
 
-App code is [MIT licensed](LICENSE). Vendored TradingView Lightweight Charts is Apache-2.0 with attribution; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Data providers retain their own terms and redistribution rights; no provider data is distributed in this repository.
+App code is [MIT licensed](LICENSE). Vendored TradingView Lightweight Charts is Apache-2.0 with attribution; see [third-party notices](docs/THIRD_PARTY_NOTICES.md). Data providers retain their own terms and redistribution rights; no provider data is distributed in this repository.
 
 Swing Signal is a personal research tool, not financial advice or an execution platform. It does not provide guaranteed entries, validated win rates, price targets, automatic trading, verified future event calendars or closed-app alerts. Read the evidence, define your risk and make your own decision.

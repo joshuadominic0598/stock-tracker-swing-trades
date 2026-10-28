@@ -1,4 +1,4 @@
 * text=auto eol=lf
 *.command text eol=lf
 *.png binary
-web/vendor/lightweight-charts.js linguist-vendored
+src/swing_signal/web/vendor/lightweight-charts.js linguist-vendored

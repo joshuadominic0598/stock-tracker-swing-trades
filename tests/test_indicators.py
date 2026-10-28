@@ -1,8 +1,7 @@
 import unittest
 from datetime import date, timedelta
 
-from app.indicators import candidate_zones, enrich, rsi, summarize, weekly
-
+from swing_signal.analysis.indicators import candidate_zones, enrich, rsi, summarize, weekly
 
 def candles(closes):
     start = date(2025, 1, 1)
@@ -17,7 +16,6 @@ def candles(closes):
         )
         for i, c in enumerate(closes)
     ]
-
 
 class IndicatorTests(unittest.TestCase):
     def test_wilder_reference_example(self):
@@ -110,7 +108,6 @@ class IndicatorTests(unittest.TestCase):
         bars = candles([100 + i for i in range(45)])
         bars[-2]["low"] = 80
         self.assertEqual(candidate_zones(enrich(bars)), [])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,15 @@
+.git/
+.venv/
+**/node_modules/
+**/vendor/**
+data/
+.tmp/
+playwright-report/
+test-results/
+*.py
+*.command
+*.svg
+**/package-lock.json
+build/
+dist/
+*.egg-info/

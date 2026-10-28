@@ -1,0 +1,25 @@
+{
+  "name": "swing-signal",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Development checks for the Swing Signal swing research app",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "format": "cd ../.. && prettier --config tools/web/prettier.json --ignore-path tools/web/prettierignore --write .",
+    "format:check": "cd ../.. && prettier --config tools/web/prettier.json --ignore-path tools/web/prettierignore --check .",
+    "lint": "cd ../.. && eslint --config tools/web/eslint.config.js .",
+    "test:ui": "playwright test",
+    "check": "npm run format:check && npm run lint"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10"
+  }
+}

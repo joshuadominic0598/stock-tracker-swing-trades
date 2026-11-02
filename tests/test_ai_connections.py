@@ -55,6 +55,7 @@ class ConnectionTests(unittest.TestCase):
     def selected(self):
         return dict(
             summary=["T_CLOSE"],
+            news=[],
             observations=["T_CLOSE"],
             counterpoints=["T_ZONE"],
             unknowns=["U_ZONE"],
@@ -97,6 +98,24 @@ class ConnectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not both"):
             settings.update(dict(groq_api_key="replacement-secret", clear_groq_api_key=True))
         self.assertEqual(settings.path().read_bytes(), original)
+
+    def test_unsupported_news_interpretation_does_not_replace_a_saved_brief(self):
+        self.enable_keys()
+        storage.cache_set("ai:HCG:1d", dict(keep="existing"), "2026-10-29")
+        selected = self.selected()
+        selected["news"] = [dict(source_id="INVENTED", impact="positive")]
+        raw = dict(choices=[dict(message=dict(content=json.dumps(selected)), finish_reason="stop")])
+        with (
+            patch("swing_signal.ai.intelligence.evidence_pack", return_value=[self.source()]),
+            patch("urllib.request.urlopen", return_value=response(raw)),
+        ):
+            with self.assertRaisesRegex(ValueError, "unsupported news"):
+                intelligence.generate(
+                    dict(symbol="HCG", name="HCG", market="NSE"),
+                    "openai/gpt-oss-20b",
+                    provider="groq",
+                )
+        self.assertEqual(storage.cache_get("ai:HCG:1d")["value"], dict(keep="existing"))
 
     def test_environment_keys_override_disk_without_being_copied_to_it(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "environment-secret"}):

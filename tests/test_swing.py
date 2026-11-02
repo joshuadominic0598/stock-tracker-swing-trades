@@ -324,6 +324,7 @@ class AIIntegrationTests(unittest.TestCase):
         )
         selected = dict(
             summary=["T_CLOSE"],
+            news=[],
             observations=["T_CLOSE"],
             counterpoints=["T_ZONE"],
             unknowns=["U_ZONE"],

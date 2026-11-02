@@ -8,7 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
-from swing_signal.data import storage  # noqa: E402
+from swing_signal.ai.brief import build_report  # noqa: E402
+from swing_signal.data import market, storage  # noqa: E402
 
 def seed(folder):
     folder = folder.resolve()
@@ -65,6 +66,52 @@ def seed(folder):
             "INSERT INTO zones (symbol,kind,low,high,label,created_at) VALUES (?,?,?,?,?,?)",
             (asset["symbol"], "demand", price * 0.97, price * 0.99, "Sample demand band", stamp),
         )
+    asset = storage.asset("TCS")
+    detail = market.asset_detail(asset)
+    technical = dict(
+        id="T1",
+        title="Illustrative technical data",
+        url="https://example.com/sample",
+        as_of=stamp,
+        facts=detail["summary"],
+        swing=detail["swing"],
+        weekly_swing=detail["weekly_swing"],
+        week_partial=detail["week_partial"],
+    )
+    sources = [
+        technical,
+        dict(
+            id="N1",
+            title="Illustrative company update",
+            url="https://example.com/sample-news",
+            as_of=stamp,
+        ),
+    ]
+    overview, sections = build_report(
+        sources, [dict(source_id="N1", impact="unclear")], asset, "1d"
+    )
+    storage.cache_set(
+        "ai:TCS:1d",
+        dict(
+            report_version=1,
+            rules_version=5,
+            provider="local",
+            model="offline fixture",
+            generated_at=stamp,
+            timeframe="1d",
+            candle_as_of=detail["as_of"],
+            analysis_fingerprint=detail["analysis_fingerprint"],
+            sources=sources,
+            brief=dict(
+                overview=overview,
+                sections=sections,
+                summary=dict(text="Illustrative evidence for UI testing."),
+                watch_next=["Watch whether buyers hold the demand area."],
+                unknowns=["Illustrative data; not a forecast."],
+            ),
+        ),
+        stamp,
+    )
     storage.cache_set("migration:browser-demo", True, stamp)
 
 if __name__ == "__main__":

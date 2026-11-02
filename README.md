@@ -131,7 +131,7 @@ For local AI, install [Ollama](https://ollama.com/) and explicitly download a mo
 
 Model menus are maintained in [AI model catalog](src/swing_signal/ai/catalog.py). Availability, pricing and quotas can change: see the in-app provider links and [data sources](docs/DATA_SOURCES.md). A free/paid preference does not change provider billing. Use an unbilled/free provider account for free-only use.
 
-Connection checks read model metadata; they do not generate analysis or verify remaining credits. There are **no automatic provider/model fallbacks or background AI calls**. Models select source-linked facts, and the app renders the factual figures. No model is represented as a validated finance specialist.
+Connection checks read model metadata; they do not generate analysis or verify remaining credits. There are **no automatic provider/model fallbacks or background AI calls**. AI selects cited facts and reviews headline impact. The report starts with a plain-language overall view, then separates price signals, news, and sentiment/search interest. The app renders the figures and constrains the price view to the measured evidence. No model is represented as a validated finance specialist.
 
 ## News, public discussion and search interest
 

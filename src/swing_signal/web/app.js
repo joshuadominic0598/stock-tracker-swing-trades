@@ -590,10 +590,35 @@ function journalForm(a) {
   const j = a.journal || {};
   return `<form id="journal-form" class="journal-form"><div class="journal-intro"><div class="eyebrow">WRITE IT BEFORE THE MOVE</div><h3>What do you see here?</h3><p>Save the reason you’re watching, the level that matters, and what changes your mind.</p></div><div class="form-grid"><label class="span-2">My thesis<textarea name="thesis" rows="4" placeholder="Why this asset? What needs to happen at your level?">${esc(j.thesis || '')}</textarea></label><label class="span-2">What invalidates this idea?<textarea name="invalidation" rows="2" placeholder="Price structure, an event, or a change in the business…">${esc(j.invalidation || '')}</textarea></label><label>Holding horizon<select name="horizon">${['1–3 months', '1 month', '2–6 months', '6+ months'].map((v) => `<option ${j.horizon === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label><label>Next review<input type="date" name="review_date" value="${esc(j.review_date || '')}"/></label></div><div class="form-footer"><span>${j.updated_at ? 'Last saved ' + when(j.updated_at, true) : 'Stored on your laptop, per asset.'}</span><button class="button primary" type="submit">${icon('check')} Save thesis</button></div></form>`;
 }
+function renderStockBrief(saved, asset, refs, providerNames) {
+  const overview = saved.brief.overview;
+  const sections = saved.brief.sections;
+  const changed =
+    saved.candle_as_of !== asset.as_of || saved.analysis_fingerprint !== asset.analysis_fingerprint;
+  const point = (item) =>
+    `<div class="plain-analysis-point ${esc(item.flag || 'neutral')}"><strong>${esc(item.label)}</strong><p>${esc(item.text)}</p>${refs(item)}</div>`;
+  return `${changed ? '<div class="sync-banner warning">Prices or chart levels changed since this analysis. Regenerate for the latest view.</div>' : ''}
+    <div class="ai-result-meta"><span>${esc(providerNames[saved.provider] || saved.provider)} · ${esc(saved.model)} · ${when(saved.generated_at, true)}</span><span>Price data through ${when(saved.candle_as_of, true)}</span></div>
+    <section class="ai-summary plain-overview ${esc(overview.tone)}"><span class="eyebrow">OVERALL VIEW · ${saved.timeframe === '1w' ? 'WEEKLY' : 'DAILY'}</span><h3>${esc(overview.title)}</h3><p>${esc(overview.text)}</p><div class="plain-flag-counts"><span class="positive">${overview.green_flags} green flags</span><span class="negative">${overview.red_flags} red flags</span><small>Your screening rules; not a chance of profit.</small></div><p class="microcopy">${esc(overview.price_note)}</p>${refs(overview)}</section>
+    <div class="stock-analysis-sections">${sections
+      .map((section) => {
+        const visible =
+          section.key === 'signals'
+            ? section.points.filter((p) =>
+                ['Demand area', 'Momentum recovery', 'Recent price direction'].includes(p.label),
+              )
+            : section.points;
+        const more = section.points.filter((p) => !visible.includes(p));
+        return `<section class="plain-analysis-card ${esc(section.tone)}" data-analysis-section="${esc(section.key)}"><span class="eyebrow">${esc(section.title)}</span><h4>${esc(section.headline)}</h4><p>${esc(section.text)}</p>${visible.map(point).join('')}${more.length ? `<details><summary>All signals and sector context</summary>${more.map(point).join('')}</details>` : ''}</section>`;
+      })
+      .join('')}</div>
+    <details class="ai-evidence"><summary>Evidence, numbers and limits · ${saved.sources.length} sources</summary><p>${esc(saved.brief.summary.text)}</p><h4>What to watch next</h4><ul>${saved.brief.watch_next.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><h4>Limits of this view</h4><ul>${saved.brief.unknowns.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${saved.sources.map((source) => `<div><span class="evidence-ref">${esc(source.id)}</span><a href="${esc(source.url || asset.source_url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)}</a><small>${when(source.as_of, true)}</small></div>`).join('')}</details><p class="source-note">An evidence-based view, not a prediction. Saved analysis does not update automatically.</p>`;
+}
+
 function renderAI(el) {
   const a = state.detail,
     m = state.models,
-    saved = a.ai_brief?.rules_version === 5 ? a.ai_brief : null;
+    saved = a.ai_brief?.report_version === 1 ? a.ai_brief : null;
   if (!m) {
     el.innerHTML = researchLoading();
     api('models')
@@ -627,7 +652,7 @@ function renderAI(el) {
           : `<span class="evidence-ref">${esc(id)}</span>`;
       })
       .join(' ');
-  el.innerHTML = `<div class="ai-intro"><div><div class="eyebrow">DAILY + WEEKLY EVIDENCE, IN CONTEXT</div><h3>Explain the setup and its counterpoints.</h3><p>The signal engine calculates the lean. AI selects source-backed observations and business explanations; it cannot invent prices or override data warnings.</p></div></div><div class="ai-controls"><label>Analysis provider<select id="ai-provider" ${state.aiRunning ? 'disabled' : ''}>${Object.entries(
+  el.innerHTML = `<div class="ai-intro"><div><div class="eyebrow">DAILY + WEEKLY EVIDENCE, IN CONTEXT</div><h3>Are buyers taking control?</h3><p>Get one clear view of this stock, then see what its price signals, news and public attention each say. Sector context stays tied to the stock.</p></div></div><div class="ai-controls"><label>Analysis provider<select id="ai-provider" ${state.aiRunning ? 'disabled' : ''}>${Object.entries(
     providerNames,
   )
     .map(
@@ -638,19 +663,11 @@ function renderAI(el) {
       '',
     )}</select></label><label>Research model<select id="ai-model" ${state.aiRunning || !options.length ? 'disabled' : ''}>${options.length ? options.map((option) => `<option value="${esc(option.id)}" ${option.id === preferred ? 'selected' : ''}>${esc(option.label)}</option>`).join('') : '<option>No enabled models available</option>'}</select></label><button class="button primary" data-action="generate-ai" ${state.aiRunning || !a.available || !connection?.configured || !options.length ? 'disabled' : ''}>${icon(state.aiRunning ? 'refresh' : 'spark', state.aiRunning ? 'spinning' : '')} ${state.aiRunning ? 'Reviewing evidence…' : saved ? 'Regenerate analysis' : 'Generate analysis'}</button></div><p class="signal-note">${cloud ? `${connection?.configured ? 'API key saved; generation access is checked when requested.' : 'Add your ' + providerNames[provider] + ' key in Data & AI connections.'} ${provider === 'openai' ? 'Uses your OpenAI Platform API billing or credits. ChatGPT subscriptions do not supply API credit.' : `${connection?.tier === 'paid' ? 'Paid account' : 'Free-tier account'} selected. Billing and quota follow your provider account, not this selector.`} Public stock/sector facts, financial figures and matched headlines go to ${providerNames[provider]}. Positions and private journal stay excluded.` : `Runs through Ollama on this Mac. Qwen3 8B is the default; choose other enabled installed chat models in connections. General models explain supplied evidence; they are not validated finance specialists.`} No automatic provider or model fallback. <a href="#settings">Data & AI connections →</a></p>
 
- ${state.aiRunning ? `<div class="ai-progress">${icon('refresh', 'spinning')} Reading the selected timeframe and both directional summaries. You can continue browsing.</div>` : ''}
+ ${state.aiRunning ? `<div class="ai-progress">${icon('refresh', 'spinning')} Reviewing price signals, news and public attention for this stock. You can continue browsing.</div>` : ''}
  ${
    saved
-     ? `${saved.candle_as_of !== a.as_of || saved.rules_version !== 5 || saved.analysis_fingerprint !== a.analysis_fingerprint ? '<div class="sync-banner warning">Saved analysis uses different candles, levels or earlier signal rules. Regenerate for the current evidence.</div>' : ''}<div class="ai-result-meta"><span>${esc(providerNames[saved.provider] || saved.provider)} · ${esc(saved.model)} · ${when(saved.generated_at, true)}</span><span>Price evidence ${when(saved.candle_as_of, true)}</span></div><div class="ai-summary"><span class="eyebrow">SOURCE-GROUNDED READ</span><p>${esc(saved.brief.summary.text)}</p>${refs(saved.brief.summary)}</div><div class="ai-grid"><section><h4>What supports the idea</h4>${saved.brief.observations
-         .slice(0, 3)
-         .map((item) => `<div class="ai-observation"><p>${esc(item.text)}</p>${refs(item)}</div>`)
-         .join('')}</section><section><h4>What argues against it</h4>${saved.brief.counterpoints
-         .slice(0, 2)
-         .map((item) => `<div class="ai-observation"><p>${esc(item.text)}</p>${refs(item)}</div>`)
-         .join(
-           '',
-         )}</section><section><h4>What to review next</h4><ul>${saved.brief.watch_next.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section></div><details class="ai-evidence"><summary>Sources & limits · ${saved.sources.length} inputs</summary><section><h4>Still unknown</h4><ul>${saved.brief.unknowns.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>${saved.sources.map((source) => `<div><span class="evidence-ref">${esc(source.id)}</span><a href="${esc(source.url || a.source_url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)}</a><small>${when(source.as_of, true)}</small></div>`).join('')}</details><div class="source-note">${esc(saved.notice)} Saved analysis does not update automatically.</div>`
-     : `<div class="ai-empty"><h3>Generate an explanation when you need it.</h3><p>Both technical directions, business meaning, contrary evidence and source links. The stock’s chart, eight signals and free attention counts work without AI or an API key.</p></div>`
+     ? renderStockBrief(saved, a, refs, providerNames)
+     : `<div class="ai-empty"><h3>Get a clear stock view.</h3><p>Read whether buyers are gaining ground, sellers still lead, or a reversal is only starting. Price signals, news, and sentiment/search interest are reviewed separately.</p>${a.ai_brief ? '<p>Regenerate your earlier analysis to use this clearer format.</p>' : ''}</div>`
  }`;
 }
 

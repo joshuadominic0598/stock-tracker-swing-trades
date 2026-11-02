@@ -22,6 +22,33 @@ async function mockModels(page) {
   );
 }
 
+test('stock analysis starts with a plain-language view and three focused sections', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await mockModels(page);
+  await page.route('**/api/research/**', (route) => route.fulfill({ json: {} }));
+  await page.goto('/#asset/TCS');
+  await page.locator('[data-action=research-tab][data-value=ai]').click();
+  await expect(page.locator('.plain-overview h3')).toBeVisible();
+  await expect(page.locator('[data-analysis-section]')).toHaveCount(3);
+  await expect(page.locator('[data-analysis-section=news]')).toContainText('What the news says');
+  await expect(page.locator('[data-analysis-section=attention]')).toContainText(
+    'Google search trend not measured',
+  );
+  await expect(page.locator('.plain-flag-counts')).toContainText('green flags');
+  await page
+    .locator('#research-content')
+    .screenshot({ path: '../../.tmp/plain-stock-analysis-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  expect(errors).toEqual([]);
+  await page
+    .locator('#research-content')
+    .screenshot({ path: '../../.tmp/plain-stock-analysis.png' });
+});
+
 test('a newly typed key is saved before testing and changed settings cannot show stale success', async ({
   page,
 }) => {

@@ -907,15 +907,57 @@ document.addEventListener('click', async (event) => {
     }
     if (action === 'check-ai-connection') {
       const provider = button.dataset.provider,
-        status = document.querySelector(`[data-connection-status="${provider}"]`);
+        card = button.closest('.provider-card'),
+        form = button.closest('form'),
+        status = card.querySelector('[data-connection-status]'),
+        revision = card.dataset.revision || '0';
       button.disabled = true;
-      status.textContent = 'Checking saved connection…';
+      status.textContent = 'Saving and checking this connection…';
+      status.className = 'connection-status';
       try {
-        const result = await api('connections/check', { provider });
+        const draft =
+          provider === 'local'
+            ? {
+                local_model: form.elements.local_model.value,
+                local_models: [...form.querySelectorAll('[name=local_models]:checked')].map(
+                  (e) => e.value,
+                ),
+              }
+            : {
+                [provider + '_api_key']: form.elements[provider + '_api_key'].value,
+                [provider + '_model']: form.elements[provider + '_model'].value,
+                ['clear_' + provider + '_api_key']:
+                  form.elements['clear_' + provider + '_api_key'].checked,
+                ...(provider !== 'openai'
+                  ? { [provider + '_tier']: form.elements[provider + '_tier'].value }
+                  : {}),
+              };
+        if (draft['clear_' + provider + '_api_key'])
+          throw new Error(
+            'Uncheck Remove saved key before testing, or use Save connections to remove it.',
+          );
+        state.data.connections = await api('connections', draft);
+        state.models = null;
+        if (provider !== 'local' && (card.dataset.revision || '0') === revision) {
+          form.elements[provider + '_api_key'].value = '';
+          form.elements[provider + '_api_key'].placeholder = 'Saved · leave blank to keep';
+          card.querySelector('.provider-card-heading .pill').textContent = 'KEY SAVED';
+        }
+        const result = await api('connections/check', {
+          provider,
+          model: draft[provider + '_model'],
+        });
+        if ((card.dataset.revision || '0') !== revision) {
+          status.textContent = 'Settings changed during the check. Save and check again.';
+          return;
+        }
         status.textContent = result.message;
         status.className = 'connection-status positive';
       } catch (e) {
-        status.textContent = e.message;
+        status.textContent =
+          (card.dataset.revision || '0') !== revision
+            ? 'Settings changed. Save and check again.'
+            : e.message;
         status.className = 'connection-status negative';
       } finally {
         button.disabled = false;
@@ -1097,6 +1139,17 @@ document.addEventListener('submit', async (event) => {
   }
 });
 document.addEventListener('input', (e) => {
+  const card = e.target.closest('.provider-card');
+  if (card && e.target.form?.id === 'connections-form') {
+    card.dataset.revision = String(Number(card.dataset.revision || 0) + 1);
+    const provider = card.dataset.provider;
+    if (e.target.name === provider + '_api_key' && e.target.value.trim())
+      e.target.form.elements['clear_' + provider + '_api_key'].checked = false;
+    const status = card.querySelector('[data-connection-status]');
+    status.textContent = 'Changed · save and check to verify these settings.';
+    status.className = 'connection-status';
+    card.querySelector('[data-action=check-ai-connection]').disabled = false;
+  }
   if (e.target.id === 'catalog-search') {
     clearTimeout(catalogTimer);
     catalogTimer = setTimeout(() => findCatalog(e.target.value), 300);
@@ -1388,11 +1441,11 @@ function connectionsPanel() {
   )
     .map(
       ([id, name]) =>
-        `<section class="provider-card" data-provider="${id}"><div class="provider-card-heading"><h3>${name}</h3><span class="pill">${id === 'local' ? (p.local?.configured ? 'LOCAL AVAILABLE' : state.models ? 'START OLLAMA' : 'CHECKING…') : c[id + '_api_key_configured'] ? 'KEY SAVED' : 'ADD API KEY'}</span></div><p>${descriptions[id]}</p>${id === 'local' ? `<div id="ollama-model-options">${ollamaOptions(c)}</div><p class="microcopy">${esc(p.local?.reason || 'Checking the local Ollama service…')} No model is downloaded automatically.</p><button type="button" class="text-button" data-action="refresh-ai-models">Refresh installed models ${icon('refresh')}</button>` : `<label>${name} API key<input name="${id}_api_key" type="password" autocomplete="new-password" placeholder="${c[id + '_api_key_configured'] ? 'Saved · leave blank to keep' : 'Paste your ' + name + ' API key'}"/></label>${id !== 'openai' ? `<label>Account plan<select name="${id}_tier"><option value="free" ${c[id + '_tier'] !== 'paid' ? 'selected' : ''}>Free tier</option><option value="paid" ${c[id + '_tier'] === 'paid' ? 'selected' : ''}>Paid tier</option></select></label>` : ''}<label>Default model<select name="${id}_model">${cloudModelOptions(id, c[id + '_tier'] || 'free', c[id + '_model'])}</select></label><details><summary>Key settings</summary><label class="checkbox-label"><input type="checkbox" name="clear_${id}_api_key"/>Remove saved ${name} key</label>${c[id + '_api_key_from_environment'] ? '<p>An environment key is active. Remove it from the app’s launch environment to disconnect it.</p>' : ''}</details>`}<div class="provider-actions"><button type="button" class="button secondary" data-action="check-ai-connection" data-provider="${id}" ${id !== 'local' && !c[id + '_api_key_configured'] ? 'disabled' : ''}>Check saved connection</button>${p[id]?.links ? `<a href="${esc(p[id].links.key)}" target="_blank" rel="noopener noreferrer">${id === 'local' ? 'Get Ollama' : 'Get API key'} ↗</a>` : ''}</div><p class="connection-status" data-connection-status="${id}" aria-live="polite"></p>${p[id]?.links && id !== 'local' ? `<div class="connection-links"><a href="${esc(p[id].links.pricing)}" target="_blank" rel="noopener noreferrer">Pricing / limits ↗</a><a href="${esc(p[id].links.usage)}" target="_blank" rel="noopener noreferrer">Usage / account ↗</a></div>` : ''}</section>`,
+        `<section class="provider-card" data-provider="${id}"><div class="provider-card-heading"><h3>${name}</h3><span class="pill">${id === 'local' ? (p.local?.configured ? 'LOCAL AVAILABLE' : state.models ? 'START OLLAMA' : 'CHECKING…') : c[id + '_api_key_configured'] ? 'KEY SAVED' : 'ADD API KEY'}</span></div><p>${descriptions[id]}</p>${id === 'local' ? `<div id="ollama-model-options">${ollamaOptions(c)}</div><p class="microcopy">${esc(p.local?.reason || 'Checking the local Ollama service…')} No model is downloaded automatically.</p><button type="button" class="text-button" data-action="refresh-ai-models">Refresh installed models ${icon('refresh')}</button>` : `<label>${name} API key<input name="${id}_api_key" type="password" autocomplete="new-password" placeholder="${c[id + '_api_key_configured'] ? 'Saved · leave blank to keep' : 'Paste your ' + name + ' API key'}"/></label>${id !== 'openai' ? `<label>Account plan<select name="${id}_tier"><option value="free" ${c[id + '_tier'] !== 'paid' ? 'selected' : ''}>Free tier</option><option value="paid" ${c[id + '_tier'] === 'paid' ? 'selected' : ''}>Paid tier</option></select></label>` : ''}<label>Default model<select name="${id}_model">${cloudModelOptions(id, c[id + '_tier'] || 'free', c[id + '_model'])}</select></label><details><summary>Key settings</summary><label class="checkbox-label"><input type="checkbox" name="clear_${id}_api_key"/>Remove saved ${name} key</label>${c[id + '_api_key_from_environment'] ? '<p>An environment key is active. Remove it from the app’s launch environment to disconnect it.</p>' : ''}</details>`}<div class="provider-actions"><button type="button" class="button secondary" data-action="check-ai-connection" data-provider="${id}" ${id !== 'local' && !c[id + '_api_key_configured'] ? 'disabled' : ''}>Save & check connection</button>${p[id]?.links ? `<a href="${esc(p[id].links.key)}" target="_blank" rel="noopener noreferrer">${id === 'local' ? 'Get Ollama' : 'Get API key'} ↗</a>` : ''}</div><p class="connection-status" data-connection-status="${id}" aria-live="polite"></p>${p[id]?.links && id !== 'local' ? `<div class="connection-links"><a href="${esc(p[id].links.pricing)}" target="_blank" rel="noopener noreferrer">Pricing / limits ↗</a><a href="${esc(p[id].links.usage)}" target="_blank" rel="noopener noreferrer">Usage / account ↗</a></div>` : ''}</section>`,
     )
     .join(
       '',
-    )}</div><p class="signal-note">Save changes before checking a connection. Checks only read model information; they do not generate analysis. Free / paid is your account preference: the provider determines actual charges and quotas. Use an unbilled/free provider account for free-only use. No automatic model or provider fallback.</p><div class="form-footer"><span>Blank key fields keep existing keys. Analysis runs only when you request it.</span><button class="button primary" type="submit">Save connections</button></div></fieldset></form><details class="price-connection"><summary>Stock prices · Yahoo Finance · no sign-in needed</summary><p>NSE and US stock prices and daily history use Yahoo Finance. Crypto uses Binance and CoinGecko. Quotes and completed signal candles keep separate timestamps.</p></details></section>`;
+    )}</div><p class="signal-note">Save & check saves the settings on that provider card, then checks model access. Checks only read model information; they do not generate analysis. Free / paid is your account preference: the provider determines actual charges and quotas. Use an unbilled/free provider account for free-only use. No automatic model or provider fallback.</p><div class="form-footer"><span>Blank key fields keep existing keys. Analysis runs only when you request it.</span><button class="button primary" type="submit">Save connections</button></div></fieldset></form><details class="price-connection"><summary>Stock prices · Yahoo Finance · no sign-in needed</summary><p>NSE and US stock prices and daily history use Yahoo Finance. Crypto uses Binance and CoinGecko. Quotes and completed signal candles keep separate timestamps.</p></details></section>`;
 }
 let catalogTimer = null,
   catalogRequest = 0;

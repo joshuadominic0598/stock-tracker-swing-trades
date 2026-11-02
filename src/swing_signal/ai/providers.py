@@ -26,7 +26,7 @@ def request_json(url, body=None, headers=None, timeout=180, provider="local"):
             return json.load(response)
     except urllib.error.HTTPError as exc:
         detail = {
-            401: "API key was rejected",
+            401: "API key was rejected; save a newly created key and check again",
             403: "account or model access was denied",
             404: "selected model is unavailable",
             429: "quota or rate limit reached; check your provider account",
@@ -41,6 +41,8 @@ def request_json(url, body=None, headers=None, timeout=180, provider="local"):
             error_body = {}
         error = error_body.get("error")
         code = error.get("code") if isinstance(error, dict) else None
+        if exc.code == 400 and code == "json_validate_failed":
+            detail = "model response did not match the report format; regenerate the analysis"
         if exc.code == 403:
             if (
                 error_body.get("error_code") == 1010

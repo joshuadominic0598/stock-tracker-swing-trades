@@ -88,6 +88,8 @@ def update(body):
         if values["local_model"] not in values["local_models"]:
             raise ValueError("Enable the selected default Ollama model")
         for key in SECRET_KEYS:
+            if body.get("clear_" + key) and body.get(key):
+                raise ValueError("Choose either a new key or Remove saved key, not both")
             if body.get("clear_" + key):
                 values.pop(key, None)
             elif body.get(key):

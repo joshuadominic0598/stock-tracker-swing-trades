@@ -91,6 +91,13 @@ class ConnectionTests(unittest.TestCase):
         self.assertFalse(settings.public()["openai_api_key_configured"])
         self.assertTrue(settings.public()["gemini_api_key_configured"])
 
+    def test_new_key_and_remove_flag_cannot_silently_delete_a_credential(self):
+        self.enable_keys()
+        original = settings.path().read_bytes()
+        with self.assertRaisesRegex(ValueError, "not both"):
+            settings.update(dict(groq_api_key="replacement-secret", clear_groq_api_key=True))
+        self.assertEqual(settings.path().read_bytes(), original)
+
     def test_environment_keys_override_disk_without_being_copied_to_it(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "environment-secret"}):
             settings.update({})

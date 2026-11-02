@@ -118,7 +118,7 @@ Research groups are customizable tracking categories, not formal NSE sector inde
 
 ## Optional AI: choose your provider and model
 
-The core signals and charts work without AI. Open **Data & AI connections**, save the relevant key/defaults, then use **Check saved connection**. For each stock, open **AI analysis** and select the provider and model before generating.
+The core signals and charts work without AI. Open **Data & AI connections**, enter the relevant key/defaults, then use **Save & check connection** on that provider’s card. For each stock, open **AI analysis** and select the provider and model before generating.
 
 | Provider   | Choices and access                                                                                                                                     |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |

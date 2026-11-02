@@ -7,6 +7,8 @@ export default [
       'src/swing_signal/web/vendor/**',
       '**/node_modules/**',
       '.tmp/**',
+      'build/**',
+      'dist/**',
       'data/**',
       'playwright-report/**',
       'test-results/**',
